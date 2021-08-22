@@ -15,8 +15,6 @@
 
 #![no_std]
 #![feature(asm)]
-#![feature(llvm_asm)]
-#![feature(global_asm)]
 #![feature(linkage)]
 //#![deny(warnings)]
 
@@ -41,9 +39,10 @@ use kernel_hal::UserContext;
 use naive_timer::Timer;
 use spin::Mutex;
 
-pub mod arch;
+mod arch;
+mod serial;
 
-pub use self::arch::*;
+pub use self::{arch::*, serial::*};
 
 #[allow(improper_ctypes)]
 extern "C" {
@@ -190,16 +189,6 @@ pub fn frame_copy(src: PhysAddr, target: PhysAddr) {
     }
 }
 
-/// Zero `target` frame.
-#[export_name = "hal_frame_zero"]
-pub fn frame_zero_in_range(target: PhysAddr, start: usize, end: usize) {
-    assert!(start < PAGE_SIZE && end <= PAGE_SIZE);
-    trace!("frame_zero: {:#x?}", target);
-    unsafe {
-        core::ptr::write_bytes(phys_to_virt(target + start) as *mut u8, 0, end - start);
-    }
-}
-
 lazy_static! {
     pub static ref NAIVE_TIMER: Mutex<Timer> = Mutex::new(Timer::default());
 }
@@ -209,21 +198,16 @@ pub fn timer_set(deadline: Duration, callback: Box<dyn FnOnce(Duration) + Send +
     NAIVE_TIMER.lock().add(deadline, callback);
 }
 
-#[export_name = "hal_timer_tick"]
 pub fn timer_tick() {
     let now = arch::timer_now();
     NAIVE_TIMER.lock().expire(now);
 }
 
 /// Initialize the HAL.
-pub fn init(config: Config) {
+pub fn init(config: arch::Config) {
     unsafe {
         trapframe::init();
     }
-
-    #[cfg(target_arch = "riscv64")]
-    trace!("hal dtb: {:#x}", config.dtb);
-
     arch::init(config);
 }
 

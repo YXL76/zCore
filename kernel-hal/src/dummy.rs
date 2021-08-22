@@ -70,10 +70,6 @@ pub trait PageTableTrait: Sync + Send {
     /// Get the physical address of root page table.
     fn table_phys(&self) -> PhysAddr;
 
-    #[cfg(target_arch = "riscv64")]
-    /// Activate this page table
-    fn activate(&self);
-
     fn map_many(
         &mut self,
         mut vaddr: VirtAddr,
@@ -163,14 +159,6 @@ impl PageTableTrait for PageTable {
     #[export_name = "hal_pt_table_phys"]
     fn table_phys(&self) -> PhysAddr {
         self.table_phys
-    }
-
-    /// Activate this page table
-    #[cfg(target_arch = "riscv64")]
-    #[linkage = "weak"]
-    #[export_name = "hal_pt_activate"]
-    fn activate(&self) {
-        unimplemented!()
     }
 
     #[linkage = "weak"]
@@ -297,19 +285,6 @@ pub fn timer_now() -> Duration {
 #[linkage = "weak"]
 #[export_name = "hal_timer_set"]
 pub fn timer_set(_deadline: Duration, _callback: Box<dyn FnOnce(Duration) + Send + Sync>) {
-    unimplemented!()
-}
-
-#[linkage = "weak"]
-#[export_name = "hal_timer_set_next"]
-pub fn timer_set_next() {
-    unimplemented!()
-}
-
-/// Check timers, call when timer interrupt happened.
-#[linkage = "weak"]
-#[export_name = "hal_timer_tick"]
-pub fn timer_tick() {
     unimplemented!()
 }
 

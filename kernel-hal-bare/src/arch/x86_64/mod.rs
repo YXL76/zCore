@@ -150,12 +150,6 @@ impl PageTableTrait for PageTableImpl {
     fn table_phys(&self) -> PhysAddr {
         self.root_paddr
     }
-
-    // /// Activate this page table
-    // #[export_name = "hal_pt_activate"]
-    // fn activate(&self) {
-    //     unimplemented!()
-    // }
 }
 
 /// Set page table.
@@ -279,41 +273,6 @@ pub fn putfmt(fmt: Arguments) {
     if let Some(console) = CONSOLE.lock().as_mut() {
         console.write_fmt(fmt).unwrap();
     }
-}
-
-lazy_static! {
-    static ref STDIN: Mutex<VecDeque<u8>> = Mutex::new(VecDeque::new());
-    static ref STDIN_CALLBACK: Mutex<Vec<Box<dyn Fn() -> bool + Send + Sync>>> =
-        Mutex::new(Vec::new());
-}
-
-/// Put a char by serial interrupt handler.
-fn serial_put(mut x: u8) {
-    if x == b'\r' {
-        x = b'\n';
-    }
-    STDIN.lock().push_back(x);
-    STDIN_CALLBACK.lock().retain(|f| !f());
-}
-
-#[export_name = "hal_serial_set_callback"]
-pub fn serial_set_callback(callback: Box<dyn Fn() -> bool + Send + Sync>) {
-    STDIN_CALLBACK.lock().push(callback);
-}
-
-#[export_name = "hal_serial_read"]
-pub fn serial_read(buf: &mut [u8]) -> usize {
-    let mut stdin = STDIN.lock();
-    let len = stdin.len().min(buf.len());
-    for c in &mut buf[..len] {
-        *c = stdin.pop_front().unwrap();
-    }
-    len
-}
-
-#[export_name = "hal_serial_write"]
-pub fn serial_write(s: &str) {
-    putfmt(format_args!("{}", s));
 }
 
 /// Get TSC frequency.
