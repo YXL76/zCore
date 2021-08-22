@@ -46,6 +46,7 @@ pub fn virtio_probe(node: &Node) {
     }
 }
 
+use alloc::boxed::Box;
 /// virtio_mmio
 /////////
 /// virtio_blk
@@ -134,6 +135,15 @@ impl InputDriver for VirtIOInputDriver {
     fn mouse_xy(&self) -> (i32, i32) {
         self.0.lock().mouse_xy()
     }
+
+    fn key(&self, key: &mut [u8; 96]) {
+        let input = self.0.lock();
+        key.copy_from_slice(input.key());
+    }
+
+    fn set_event(&self, event: Box<dyn Fn(virtio_drivers::EventRepr) + Send + Sync>) {
+        self.0.lock().set_event(event)
+    }
 }
 
 impl GpuDriver for VirtIOGpuDriver {
@@ -141,18 +151,17 @@ impl GpuDriver for VirtIOGpuDriver {
         self.0.lock().resolution()
     }
 
+    fn set_framebuffer(&self, handler: Box<dyn Fn(&mut [u8])>) {
+        let gpu = self.0.lock();
+        let fb = gpu.framebuffer();
+        if let Some(fb) = fb {
+            handler(fb);
+        }
+    }
+
     fn setup_framebuffer(&self) /* -> virtio_drivers::Result<&mut [u8]> */
     {
-        let mut x = self.0.lock();
-        let fb = x.setup_framebuffer().expect("failed to get fb");
-        for y in 0..270 {
-            for x in 0..480 {
-                let idx = (y * 480 + x) * 4;
-                fb[idx] = x as u8;
-                fb[idx + 1] = y as u8;
-                fb[idx + 2] = (x + y) as u8;
-            }
-        }
+        self.0.lock().setup_framebuffer().expect("failed to get fb");
     }
 
     fn flush(&self) -> virtio_drivers::Result {

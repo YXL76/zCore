@@ -64,11 +64,13 @@ else ifeq ($(arch), riscv64)
 qemu_opts += \
 	-machine virt \
 	-bios default \
+	-serial mon:stdio \
 	-no-reboot \
 	-no-shutdown \
-	-nographic \
 	-drive file=$(QEMU_DISK),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \
+	-device virtio-gpu-device \
+	-device virtio-mouse-device \
 	-kernel $(kernel_bin)
 
 endif
@@ -92,7 +94,7 @@ else
 ifeq ($(MAKECMDGOALS), vbox)
 build_args += --features graphic
 else
-qemu_opts += -display none -nographic
+# qemu_opts += -display none -nographic
 baremetal-test-qemu_opts += -display none -nographic
 endif
 endif

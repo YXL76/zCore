@@ -32,7 +32,7 @@ use rboot::BootInfo;
 #[cfg(target_arch = "riscv64")]
 use kernel_hal_bare::{
     phys_to_virt, remap_the_kernel,
-    virtio::{BlockDriverWrapper, BLK_DRIVERS},
+    virtio::{BlockDriverWrapper, EventRepr, BLK_DRIVERS, GPU_DRIVERS, INPUT_DRIVERS},
     BootInfo, GraphicInfo,
 };
 
@@ -215,6 +215,47 @@ fn main(ramfs_data: &'static mut [u8], cmdline: &str) -> ! {
 }
 
 fn run() -> ! {
+    use alloc::boxed::Box;
+    use alloc::sync::Arc;
+    use spin::Mutex;
+
+    let inputs = INPUT_DRIVERS
+        .read()
+        .iter()
+        .map(|d| d.clone())
+        .collect::<Vec<_>>();
+
+    let gpu = GPU_DRIVERS
+        .read()
+        .iter()
+        .next()
+        .expect("Gpu device not found")
+        .clone();
+
+    gpu.setup_framebuffer();
+    gpu.flush().expect("failed to flush");
+    let (width, height) = gpu.resolution();
+    let width = width as i32;
+    let height = height as i32;
+
+    /* let x = Arc::new(Mutex::new(0));
+    let y = Arc::new(Mutex::new(0));
+    let xc = Arc::clone(&x);
+    let yc = Arc::clone(&y);
+    input.set_event(Box::new(move |event| match event {
+        EventRepr::RelX(dx) => {
+            let mut xc = xc.lock();
+            *xc += dx;
+            *xc = xc.min(width - 1).max(0);
+        }
+        EventRepr::RelY(dy) => {
+            let mut yc = yc.lock();
+            *yc += dy;
+            *yc = yc.min(height - 1).max(0);
+        }
+        _ => (),
+    })); */
+
     loop {
         executor::run_until_idle();
         #[cfg(target_arch = "x86_64")]
@@ -222,8 +263,30 @@ fn run() -> ! {
             x86_64::instructions::interrupts::enable_and_hlt();
             x86_64::instructions::interrupts::disable();
         }
-        #[cfg(target_arch = "riscv64")]
-        kernel_hal_bare::interrupt::wait_for_interrupt();
+        /* #[cfg(target_arch = "riscv64")]
+        kernel_hal_bare::interrupt::wait_for_interrupt(); */
+        let mut x = 0;
+        let mut y = 0;
+        for i in &inputs {
+            i.try_handle_interrupt(None);
+            let (dx, dy) = i.mouse_xy();
+            x += dx;
+            y += dy;
+        }
+        x = x.max(0).min(width - 1);
+        y = y.max(0).min(height - 1);
+        gpu.set_framebuffer(Box::new(move |fb| {
+            fb.fill(0);
+            for x in 0.max(x - 5)..(width - 1).min(x + 5) {
+                for y in 0.max(y - 5)..(height - 1).min(y + 5) {
+                    let idx = ((y * width + x) * 4) as usize;
+                    fb[idx] = 128;
+                    fb[idx + 1] = 128;
+                    fb[idx + 2] = 128;
+                }
+            }
+        }));
+        gpu.flush().expect("failed to flush");
     }
 }
 

@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -12,6 +13,8 @@ pub mod virtio;
 
 /// Device tree
 pub mod device_tree;
+
+pub use virtio_drivers::EventRepr;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceType {
@@ -73,12 +76,24 @@ pub trait InputDriver: Driver {
     fn mouse_xy(&self) -> (i32, i32) {
         unimplemented!("not a input driver")
     }
+
+    fn key(&self, key: &mut [u8; 96]) {
+        unimplemented!("not a input driver")
+    }
+
+    fn set_event(&self, event: Box<dyn Fn(virtio_drivers::EventRepr) + Send + Sync>) {
+        unimplemented!("not a input driver")
+    }
 }
 /////////
 
 /////////
 pub trait GpuDriver: Driver {
     fn resolution(&self) -> (u32, u32) {
+        unimplemented!("not a gpu driver")
+    }
+
+    fn set_framebuffer(&self, fb: Box<dyn Fn(&mut [u8])>) {
         unimplemented!("not a gpu driver")
     }
 
