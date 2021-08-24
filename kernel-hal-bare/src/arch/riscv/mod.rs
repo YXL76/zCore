@@ -1,18 +1,21 @@
 use super::super::*;
-use kernel_hal::{HalError, PageTableTrait, PhysAddr, VirtAddr};
+use kernel_hal::{
+    ColorDepth, ColorFormat, FramebufferInfo, HalError, PageTableTrait, PhysAddr, Result, VirtAddr,
+    FRAME_BUFFER,
+};
 use riscv::addr::Page;
 use riscv::asm::sfence_vma_all;
 use riscv::paging::{PageTableFlags as PTF, *};
 use riscv::register::{satp, sie, stval, time};
 //use crate::sbi;
-use alloc::{collections::VecDeque, vec::Vec, string::String};
-use core::fmt::{self, Write};
 use self::consts::PHYSICAL_MEMORY_OFFSET;
+use alloc::{collections::VecDeque, string::String, vec::Vec};
+use core::fmt::{self, Write};
 
-mod sbi;
 mod consts;
 pub mod interrupt;
 mod plic;
+mod sbi;
 pub mod virtio;
 
 // First core stores its SATP here.
@@ -393,8 +396,9 @@ pub fn apic_local_id() -> u8 {
 }
 
 lazy_static! {
-    static ref UART: Mutex<uart_16550::MmioSerialPort> 
-        = Mutex::new(unsafe { uart_16550::MmioSerialPort::new(0x1000_0000 + PHYSICAL_MEMORY_OFFSET) });
+    static ref UART: Mutex<uart_16550::MmioSerialPort> = Mutex::new(unsafe {
+        uart_16550::MmioSerialPort::new(0x1000_0000 + PHYSICAL_MEMORY_OFFSET)
+    });
 }
 
 struct Stdout;
@@ -472,4 +476,21 @@ pub fn current_page_table() -> usize {
     #[cfg(target_arch = "riscv64")]
     let mode = satp::Mode::Sv39;
     satp::read().ppn() << 12
+}
+
+pub fn init_framebuffer(width: u32, height: u32, addr: usize, size: usize) {
+    let fb_info = FramebufferInfo {
+        xres: width,
+        yres: height,
+        xres_virtual: width,
+        yres_virtual: height,
+        xoffset: 0,
+        yoffset: 0,
+        depth: ColorDepth::ColorDepth32,
+        format: ColorFormat::RGBA8888,
+        paddr: virt_to_phys(addr),
+        vaddr: addr,
+        screen_size: size,
+    };
+    *FRAME_BUFFER.write() = Some(fb_info);
 }

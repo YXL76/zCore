@@ -1,7 +1,7 @@
 use {
     super::super::*,
     acpi::{parse_rsdp, Acpi, AcpiHandler, PhysicalMapping},
-    alloc::{collections::VecDeque, vec::Vec},
+    // alloc::{collections::VecDeque, vec::Vec},
     apic::{LocalApic, XApic},
     core::arch::x86_64::{__cpuid, _mm_clflush, _mm_mfence},
     core::convert::TryFrom,
@@ -9,8 +9,10 @@ use {
     core::ptr::NonNull,
     core::time::Duration,
     git_version::git_version,
-    kernel_hal::{HalError, PageTableTrait, Result},
-    rcore_console::{Console, ConsoleOnGraphic, DrawTarget, Pixel, Rgb888, Size},
+    kernel_hal::{
+        ColorDepth, ColorFormat, FramebufferInfo, HalError, PageTableTrait, Result, FRAME_BUFFER,
+    },
+    // rcore_console::{Console, ConsoleOnGraphic, DrawTarget, Pixel, Rgb888, Size},
     spin::Mutex,
     uart_16550::SerialPort,
     x86_64::{
@@ -228,7 +230,7 @@ impl FrameDeallocator<Size4KiB> for FrameAllocatorImpl {
     }
 }
 
-static CONSOLE: Mutex<Option<ConsoleOnGraphic<Framebuffer>>> = Mutex::new(None);
+/* static CONSOLE: Mutex<Option<ConsoleOnGraphic<Framebuffer>>> = Mutex::new(None);
 
 struct Framebuffer {
     width: u32,
@@ -248,10 +250,10 @@ impl DrawTarget<Rgb888> for Framebuffer {
     fn size(&self) -> Size {
         Size::new(self.width, self.height)
     }
-}
+} */
 
 /// Initialize console on framebuffer.
-pub fn init_framebuffer(width: u32, height: u32, paddr: PhysAddr) {
+/* pub fn init_framebuffer(width: u32, height: u32, paddr: PhysAddr) {
     let fb = Framebuffer {
         width,
         height,
@@ -264,15 +266,15 @@ pub fn init_framebuffer(width: u32, height: u32, paddr: PhysAddr) {
     };
     let console = Console::on_frame_buffer(fb);
     *CONSOLE.lock() = Some(console);
-}
+} */
 
 static COM1: Mutex<SerialPort> = Mutex::new(unsafe { SerialPort::new(0x3F8) });
 
 pub fn putfmt(fmt: Arguments) {
     COM1.lock().write_fmt(fmt).unwrap();
-    if let Some(console) = CONSOLE.lock().as_mut() {
+    /* if let Some(console) = CONSOLE.lock().as_mut() {
         console.write_fmt(fmt).unwrap();
-    }
+    } */
 }
 
 /// Get TSC frequency.
@@ -468,4 +470,21 @@ fn cacheline_size() -> usize {
 #[export_name = "hal_current_pgtable"]
 pub fn current_page_table() -> usize {
     PageTableImpl::current().root_paddr
+}
+
+pub fn init_framebuffer(width: u32, height: u32, addr: usize, size: usize) {
+    let fb_info = FramebufferInfo {
+        xres: width,
+        yres: height,
+        xres_virtual: width,
+        yres_virtual: height,
+        xoffset: 0,
+        yoffset: 0,
+        depth: ColorDepth::ColorDepth32,
+        format: ColorFormat::RGBA8888,
+        paddr: addr,
+        vaddr: phys_to_virt(addr),
+        screen_size: size,
+    };
+    *FRAME_BUFFER.write() = Some(fb_info);
 }

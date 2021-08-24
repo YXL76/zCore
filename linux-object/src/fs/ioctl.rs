@@ -40,3 +40,6 @@ pub const FIOCLEX: usize = 0x6601;
 // rustc using pipe and ioctl pipe file with this request id
 // for non-blocking/blocking IO control setting
 pub const FIONBIO: usize = 0x5421;
+
+pub const FBIOGET_VSCREENINFO: usize = 0x4600;
+pub const FBIOGET_FSCREENINFO: usize = 0x4602;

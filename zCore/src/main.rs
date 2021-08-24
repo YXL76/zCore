@@ -28,7 +28,7 @@ use rboot::BootInfo;
 #[cfg(target_arch = "riscv64")]
 use kernel_hal_bare::{
     phys_to_virt, remap_the_kernel,
-    virtio::{BlockDriverWrapper, BLK_DRIVERS},
+    virtio::{BlockDriverWrapper, EventRepr, BLK_DRIVERS, GPU_DRIVERS, INPUT_DRIVERS},
 };
 
 use alloc::{string::String, vec::Vec};
@@ -43,8 +43,10 @@ pub extern "C" fn _start(boot_info: &BootInfo) -> ! {
     memory::init_heap();
     memory::init_frame_allocator(boot_info);
 
-    #[cfg(feature = "graphic")]
-    init_framebuffer(boot_info);
+    let (width, height) = boot_info.graphic_info.mode.resolution();
+    let fb_addr = boot_info.graphic_info.fb_addr as usize;
+    let fb_size = boot_info.graphic_info.fb_size as usize;
+    kernel_hal_bare::init_framebuffer(width as u32, height as u32, fb_addr, fb_size);
 
     trace!("{:#x?}", boot_info);
 
@@ -101,8 +103,8 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
 }
 
 #[cfg(feature = "linux")]
-use alloc::vec;
 fn get_rootproc(cmdline: &str) -> Vec<String> {
+    use alloc::vec;
     if let Some(value) = get_value(cmdline, "ROOTPROC") {
         let mut iter = value.trim().splitn(2, '?');
         let k1 = iter.next().expect("failed to parse k1");
@@ -120,6 +122,7 @@ fn get_rootproc(cmdline: &str) -> Vec<String> {
 fn main(ramfs_data: &'static mut [u8], cmdline: &str) -> ! {
     use alloc::boxed::Box;
     use alloc::sync::Arc;
+    use alloc::vec;
 
     #[cfg(target_arch = "x86_64")]
     use linux_object::fs::MemBuf;
@@ -137,8 +140,8 @@ fn main(ramfs_data: &'static mut [u8], cmdline: &str) -> ! {
         }
     }));
 
-    //let args: Vec<String> = vec!["/bin/busybox".into(), "sh".into()];
-    let args: Vec<String> = get_rootproc(cmdline);
+    let args: Vec<String> = vec!["libc-test/src/functional/argv.exe".into()];
+    // let args: Vec<String> = get_rootproc(cmdline);
     let envs: Vec<String> = vec!["PATH=/usr/sbin:/usr/bin:/sbin:/bin".into()];
 
     #[cfg(target_arch = "x86_64")]
@@ -172,6 +175,28 @@ fn main(ramfs_data: &'static mut [u8], cmdline: &str) -> ! {
 }
 
 fn run() -> ! {
+    /*  use alloc::boxed::Box;
+    use alloc::sync::Arc;
+    use spin::Mutex;
+
+    let inputs = INPUT_DRIVERS
+        .read()
+        .iter()
+        .map(|d| d.clone())
+        .collect::<Vec<_>>();
+
+    let gpu = GPU_DRIVERS
+        .read()
+        .iter()
+        .next()
+        .expect("Gpu device not found")
+        .clone();
+
+    gpu.setup_framebuffer();
+    gpu.flush().expect("failed to flush");
+    let (width, height) = gpu.resolution();
+    let width = width as i32;
+    let height = height as i32;
     loop {
         executor::run_until_idle();
         #[cfg(target_arch = "x86_64")]
@@ -181,6 +206,36 @@ fn run() -> ! {
         }
         #[cfg(target_arch = "riscv64")]
         kernel_hal_bare::interrupt::wait_for_interrupt();
+        let mut x = 0;
+        let mut y = 0;
+        for i in &inputs {
+            i.try_handle_interrupt(None);
+            let (dx, dy) = i.mouse_xy();
+            x += dx;
+            y += dy;
+        }
+        x = x.max(0).min(width - 1);
+        y = y.max(0).min(height - 1);
+        gpu.set_framebuffer(Box::new(move |fb| {
+            fb.fill(0);
+            for x in 0.max(x - 5)..(width - 1).min(x + 5) {
+                for y in 0.max(y - 5)..(height - 1).min(y + 5) {
+                    let idx = ((y * width + x) * 4) as usize;
+                    fb[idx] = 128;
+                    fb[idx + 1] = 128;
+                    fb[idx + 2] = 128;
+                }
+            }
+        }));
+        gpu.flush().expect("failed to flush");
+    } */
+    loop {
+        executor::run_until_idle();
+        #[cfg(target_arch = "x86_64")]
+        {
+            x86_64::instructions::interrupts::enable_and_hlt();
+            x86_64::instructions::interrupts::disable();
+        }
     }
 }
 
@@ -200,9 +255,8 @@ fn get_value<'a>(cmdline: &'a str, key: &str) -> Option<&'a str> {
     None
 }
 
-#[cfg(feature = "graphic")]
-fn init_framebuffer(boot_info: &BootInfo) {
+/* fn init_framebuffer(boot_info: &BootInfo) {
     let (width, height) = boot_info.graphic_info.mode.resolution();
     let fb_addr = boot_info.graphic_info.fb_addr as usize;
     kernel_hal_bare::init_framebuffer(width as u32, height as u32, fb_addr);
-}
+} */
