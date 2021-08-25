@@ -65,3 +65,278 @@ pub enum ColorFormat {
     BGRA8888, // RPi3 B+ uses BGRA
     VgaPalette,
 }
+
+#[repr(u32)]
+pub enum FbType {
+    /// Packed Pixels
+    PackedPixels = 0,
+    /// Non interleaved planes
+    Planes = 1,
+    /// Interleaved planes
+    InterleavedPlanes = 2,
+    /// Text/attributes
+    Text = 3,
+    /// EGA/VGA planes
+    VgaPlanes = 4,
+    /// Type identified by a V4L2 FOURCC
+    FourCC = 5,
+}
+
+#[repr(u32)]
+pub enum FbVisual {
+    /// Monochr. 1=Black 0=White
+    Mono01 = 0,
+    /// Monochr. 1=White 0=Black
+    Mono10 = 1,
+    /// True color
+    TrueColor = 2,
+    /// Pseudo color (like atari)
+    PseudoColor = 3,
+    /// Direct color
+    DirectColor = 4,
+    /// Pseudo color readonly
+    StaticPseudoColor = 5,
+    /// Visual identified by a V4L2 FOURCC
+    FourCC = 6,
+}
+
+#[repr(C)]
+pub struct FbFixScreeninfo {
+    /// identification string eg "TT Builtin"
+    id: [u8; 16],
+    /// Start of frame buffer mem (physical address)
+    smem_start: u64,
+    /// Length of frame buffer mem
+    pub smem_len: u32,
+    /// see FB_TYPE_*
+    type_: FbType,
+    /// Interleave for interleaved Planes
+    type_aux: u32,
+    /// see FB_VISUAL_*
+    visual: FbVisual,
+    /// zero if no hardware panning
+    xpanstep: u16,
+    /// zero if no hardware panning
+    ypanstep: u16,
+    /// zero if no hardware ywrap
+    ywrapstep: u16,
+    /// length of a line in bytes
+    line_length: u32,
+    /// Start of Memory Mapped I/O (physical address)
+    mmio_start: u64,
+    /// Length of Memory Mapped I/O
+    mmio_len: u32,
+    /// Indicate to driver which specific chip/card we have
+    accel: u32,
+    /// see FB_CAP_*
+    capabilities: u16,
+    /// Reserved for future compatibility
+    reserved: [u16; 2],
+}
+
+#[repr(C)]
+pub struct FbVarScreeninfo {
+    /// visible resolution x
+    pub xres: u32,
+    /// visible resolution y
+    pub yres: u32,
+    /// virtual resolution x
+    xres_virtual: u32,
+    /// virtual resolution y
+    yres_virtual: u32,
+    /// offset from virtual to visible x
+    xoffset: u32,
+    /// offset from virtual to visible y
+    yoffset: u32,
+
+    /// guess what
+    bits_per_pixel: u32,
+    /// 0 = color, 1 = grayscale, >1 = FOURCC
+    grayscale: u32,
+    /// bitfield in fb mem if true color, else only length is significant
+    red: FbBitfield,
+    green: FbBitfield,
+    blue: FbBitfield,
+    transp: FbBitfield,
+
+    /// != 0 Non standard pixel format
+    nonstd: u32,
+
+    /// see FB_ACTIVATE_*
+    activate: u32,
+
+    /// height of picture in mm
+    height: u32,
+    /// width of picture in mm
+    width: u32,
+    /// (OBSOLETE) see fb_info.flags
+    accel_flags: u32,
+
+    /* Timing: All values in pixclocks, except pixclock (of course) */
+    /// pixel clock in ps (pico seconds)
+    pixclock: u32,
+    /// time from sync to picture
+    left_margin: u32,
+    /// time from picture to sync
+    right_margin: u32,
+    /// time from sync to picture
+    upper_margin: u32,
+    lower_margin: u32,
+    /// length of horizontal sync
+    hsync_len: u32,
+    /// length of vertical sync
+    vsync_len: u32,
+    /// see FB_SYNC_*
+    sync: u32,
+    /// see FB_VMODE_*
+    vmode: u32,
+    /// angle we rotate counter clockwise
+    rotate: u32,
+    /// colorspace for FOURCC-based modes
+    colorspace: u32,
+    /// Reserved for future compatibility
+    reserved: [u32; 4],
+}
+
+#[repr(C)]
+pub struct FbBitfield {
+    /// beginning of bitfield
+    offset: u32,
+    /// length of bitfield
+    length: u32,
+    /// != 0 : Most significant bit is right
+    msb_right: u32,
+}
+
+impl FbVarScreeninfo {
+    pub fn new() -> Self {
+        Self {
+            xres: 0,
+            yres: 0,
+            xres_virtual: 0,
+            yres_virtual: 0,
+            xoffset: 0,
+            yoffset: 0,
+            bits_per_pixel: 0,
+            grayscale: 0,
+            red: FbBitfield {
+                offset: 0,
+                length: 0,
+                msb_right: 0,
+            },
+            green: FbBitfield {
+                offset: 0,
+                length: 0,
+                msb_right: 0,
+            },
+            blue: FbBitfield {
+                offset: 0,
+                length: 0,
+                msb_right: 0,
+            },
+            transp: FbBitfield {
+                offset: 0,
+                length: 0,
+                msb_right: 0,
+            },
+            nonstd: 0,
+            activate: 0,
+            height: 0,
+            width: 0,
+            accel_flags: 0,
+            pixclock: 0,
+            left_margin: 0,
+            right_margin: 0,
+            upper_margin: 0,
+            lower_margin: 0,
+            hsync_len: 0,
+            vsync_len: 0,
+            sync: 0,
+            vmode: 0,
+            rotate: 0,
+            colorspace: 0,
+            reserved: [0; 4],
+        }
+    }
+
+    pub fn fill_from(&mut self, fb_info: &FramebufferInfo) {
+        self.xres = fb_info.xres;
+        self.yres = fb_info.yres;
+        self.xres_virtual = fb_info.xres_virtual;
+        self.yres_virtual = fb_info.yres_virtual;
+        self.xoffset = fb_info.xoffset;
+        self.yoffset = fb_info.yoffset;
+        self.bits_per_pixel = fb_info.depth as u32;
+        let (rl, gl, bl, al, ro, go, bo, ao) = match fb_info.format {
+            ColorFormat::RGB332 => (3, 3, 2, 0, 5, 3, 0, 0),
+            ColorFormat::RGB565 => (5, 6, 5, 0, 11, 5, 0, 0),
+            ColorFormat::RGBA8888 => (8, 8, 8, 8, 16, 8, 0, 24),
+            ColorFormat::BGRA8888 => (8, 8, 8, 8, 0, 8, 16, 24),
+            ColorFormat::VgaPalette => unimplemented!(),
+        };
+        self.blue = FbBitfield {
+            offset: bo,
+            length: bl,
+            msb_right: 1,
+        };
+        self.green = FbBitfield {
+            offset: go,
+            length: gl,
+            msb_right: 1,
+        };
+        self.red = FbBitfield {
+            offset: ro,
+            length: rl,
+            msb_right: 1,
+        };
+        self.transp = FbBitfield {
+            offset: ao,
+            length: al,
+            msb_right: 1,
+        };
+    }
+}
+
+/// No hardware accelerator
+const FB_ACCEL_NONE: u32 = 0;
+
+impl FbFixScreeninfo {
+    pub fn new() -> Self {
+        Self {
+            id: [0; 16],
+            smem_start: 0,
+            smem_len: 0,
+            type_: FbType::PackedPixels,
+            type_aux: 0,
+            visual: FbVisual::Mono01,
+            xpanstep: 0,
+            ypanstep: 0,
+            ywrapstep: 0,
+            line_length: 0,
+            mmio_start: 0,
+            mmio_len: 0,
+            accel: 0,
+            capabilities: 0,
+            reserved: [0; 2],
+        }
+    }
+
+    pub fn fill_from(&mut self, fb_info: &FramebufferInfo) {
+        self.smem_start = fb_info.paddr as u64;
+        self.smem_len = fb_info.screen_size as u32;
+
+        self.type_ = FbType::PackedPixels;
+        // self.type_aux = fb_info.type_aux;
+        self.visual = FbVisual::TrueColor;
+
+        // self.xpanstep = 0;
+        // self.ypanstep = 0;
+        // self.ywrapstep = 0;
+
+        self.line_length = fb_info.xres * fb_info.depth as u32 / 8;
+
+        self.mmio_start = 0;
+        self.mmio_len = 0;
+        self.accel = FB_ACCEL_NONE;
+    }
+}
