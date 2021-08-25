@@ -96,7 +96,17 @@ pub extern "C" fn rust_main(hartid: usize, device_tree_paddr: usize) -> ! {
 
     let cmdline = kernel_hal_bare::cmdline();
     info!("cmdline: {:?}", cmdline);
-    logging::init(get_value(cmdline, "LOG").unwrap_or(""));
+    // logging::init(get_value(cmdline, "LOG").unwrap_or(""));
+
+    let gpu = GPU_DRIVERS
+        .read()
+        .iter()
+        .next()
+        .expect("Gpu device not found")
+        .clone();
+    let (width, height) = gpu.resolution();
+    let (fb_vaddr, fb_size) = gpu.setup_framebuffer();
+    kernel_hal_bare::init_framebuffer(width, height, fb_vaddr, fb_size);
 
     // 正常由bootloader载入文件系统镜像到内存, 这里不用，而使用后面的virtio
     main(&mut [], &cmdline);
@@ -175,28 +185,6 @@ fn main(ramfs_data: &'static mut [u8], cmdline: &str) -> ! {
 }
 
 fn run() -> ! {
-    /*  use alloc::boxed::Box;
-    use alloc::sync::Arc;
-    use spin::Mutex;
-
-    let inputs = INPUT_DRIVERS
-        .read()
-        .iter()
-        .map(|d| d.clone())
-        .collect::<Vec<_>>();
-
-    let gpu = GPU_DRIVERS
-        .read()
-        .iter()
-        .next()
-        .expect("Gpu device not found")
-        .clone();
-
-    gpu.setup_framebuffer();
-    gpu.flush().expect("failed to flush");
-    let (width, height) = gpu.resolution();
-    let width = width as i32;
-    let height = height as i32;
     loop {
         executor::run_until_idle();
         #[cfg(target_arch = "x86_64")]
@@ -206,36 +194,6 @@ fn run() -> ! {
         }
         #[cfg(target_arch = "riscv64")]
         kernel_hal_bare::interrupt::wait_for_interrupt();
-        let mut x = 0;
-        let mut y = 0;
-        for i in &inputs {
-            i.try_handle_interrupt(None);
-            let (dx, dy) = i.mouse_xy();
-            x += dx;
-            y += dy;
-        }
-        x = x.max(0).min(width - 1);
-        y = y.max(0).min(height - 1);
-        gpu.set_framebuffer(Box::new(move |fb| {
-            fb.fill(0);
-            for x in 0.max(x - 5)..(width - 1).min(x + 5) {
-                for y in 0.max(y - 5)..(height - 1).min(y + 5) {
-                    let idx = ((y * width + x) * 4) as usize;
-                    fb[idx] = 128;
-                    fb[idx + 1] = 128;
-                    fb[idx + 2] = 128;
-                }
-            }
-        }));
-        gpu.flush().expect("failed to flush");
-    } */
-    loop {
-        executor::run_until_idle();
-        #[cfg(target_arch = "x86_64")]
-        {
-            x86_64::instructions::interrupts::enable_and_hlt();
-            x86_64::instructions::interrupts::disable();
-        }
     }
 }
 

@@ -153,7 +153,7 @@ pub fn map_range(
     mut end_addr: VirtAddr,
     linear_offset: usize,
     flags: PageTableFlags,
-) -> Result<(), ()> {
+) -> Result<()> {
     trace!("Mapping range addr: {:#x} ~ {:#x}", start_addr, end_addr);
 
     start_addr = start_addr & !(PAGE_SIZE - 1);
@@ -254,7 +254,7 @@ impl PageTableImpl {
 impl PageTableTrait for PageTableImpl {
     /// Map the page of `vaddr` to the frame of `paddr` with `flags`.
     #[export_name = "hal_pt_map"]
-    fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: MMUFlags) -> Result<(), HalError> {
+    fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: MMUFlags) -> Result<()> {
         let mut pt = self.get();
         let page = Page::of_addr(riscv::addr::VirtAddr::new(vaddr));
         let frame = riscv::addr::Frame::of_addr(riscv::addr::PhysAddr::new(paddr));
@@ -274,7 +274,7 @@ impl PageTableTrait for PageTableImpl {
 
     /// Unmap the page of `vaddr`.
     #[export_name = "hal_pt_unmap"]
-    fn unmap(&mut self, vaddr: VirtAddr) -> Result<(), HalError> {
+    fn unmap(&mut self, vaddr: VirtAddr) -> Result<()> {
         let mut pt = self.get();
         let page = Page::of_addr(riscv::addr::VirtAddr::new(vaddr));
         pt.unmap(page).unwrap().1.flush();
@@ -288,7 +288,7 @@ impl PageTableTrait for PageTableImpl {
 
     /// Change the `flags` of the page of `vaddr`.
     #[export_name = "hal_pt_protect"]
-    fn protect(&mut self, vaddr: VirtAddr, flags: MMUFlags) -> Result<(), HalError> {
+    fn protect(&mut self, vaddr: VirtAddr, flags: MMUFlags) -> Result<()> {
         let mut pt = self.get();
         let page = Page::of_addr(riscv::addr::VirtAddr::new(vaddr));
         pt.update_flags(page, flags.to_ptf()).unwrap().flush();
@@ -309,7 +309,7 @@ impl PageTableTrait for PageTableImpl {
 
     /// Query the physical address which the page of `vaddr` maps to.
     #[export_name = "hal_pt_query"]
-    fn query(&mut self, vaddr: VirtAddr) -> Result<PhysAddr, HalError> {
+    fn query(&mut self, vaddr: VirtAddr) -> Result<PhysAddr> {
         let mut pt = self.get();
         let page = Page::of_addr(riscv::addr::VirtAddr::new(vaddr));
         let res = pt.ref_entry(page);

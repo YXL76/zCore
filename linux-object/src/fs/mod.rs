@@ -11,6 +11,7 @@ pub use self::device::*;
 pub use self::fb::*;
 pub use self::fcntl::*;
 pub use self::file::*;
+pub use self::input::*;
 pub use self::pipe::*;
 pub use self::pseudo::*;
 pub use self::random::*;
@@ -28,6 +29,7 @@ mod device;
 mod fb;
 mod fcntl;
 mod file;
+mod input;
 mod ioctl;
 mod pipe;
 mod pseudo;
@@ -124,6 +126,9 @@ pub fn create_root_fs(rootfs: Arc<dyn FileSystem>) -> Arc<dyn INode> {
     devfs
         .add("fb0", Arc::new(FbINode::new()))
         .expect("failed to mknod /dev/fb0");
+    devfs
+        .add("event0", Arc::new(InputEventINode::new()))
+        .expect("failed to mknod /dev/event0");
 
     // mount DevFS at /dev
     let dev = root.find(true, "dev").unwrap_or_else(|_| {

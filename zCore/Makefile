@@ -71,7 +71,7 @@ qemu_opts += \
 	-drive file=$(QEMU_DISK),format=qcow2,id=sfs \
 	-device virtio-blk-device,drive=sfs \
 	-device virtio-gpu-device \
-	-device virtio-mouse-device \
+	-device virtio-keyboard-device \
 	-kernel $(kernel_bin) \
 	-append LOG=$(log)
 
@@ -117,7 +117,11 @@ build-test: build
 	cp ../prebuilt/zircon/x64/core-tests.zbi $(ESP)/EFI/zCore/fuchsia.zbi
 	echo 'cmdline=LOG=warn:userboot=test/core-standalone-test:userboot.shutdown:core-tests=$(test_filter)' >> $(ESP)/EFI/Boot/rboot.conf
 
-build: $(kernel_img)
+tmp: 
+	cd ../rootfs/libc-test && make -j
+	cd .. && make image
+
+build: tmp $(kernel_img)
 
 build-parallel-test: build $(QEMU_DISK)
 	cp ../prebuilt/zircon/x64/core-tests.zbi $(ESP)/EFI/zCore/fuchsia.zbi

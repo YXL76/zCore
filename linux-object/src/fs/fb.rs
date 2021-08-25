@@ -78,20 +78,6 @@ impl INode for FbINode {
         }
     }
 
-    /* fn mmap(&self, area: MMapArea) -> Result<()> {
-        let attr = MmapProt::from_bits_truncate(area.prot).to_attr();
-
-        if let Some(fb) = FRAME_BUFFER.read().as_ref() {
-            if area.offset + area.end_vaddr - area.start_vaddr > fb.screen_size {
-                return Err(FsError::NoDeviceSpace);
-            }
-
-            Ok(())
-        } else {
-            Err(FsError::NoDevice)
-        }
-    } */
-
     fn metadata(&self) -> Result<Metadata> {
         Ok(Metadata {
             dev: 5,

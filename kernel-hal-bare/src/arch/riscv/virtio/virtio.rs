@@ -151,17 +151,12 @@ impl GpuDriver for VirtIOGpuDriver {
         self.0.lock().resolution()
     }
 
-    fn set_framebuffer(&self, handler: Box<dyn Fn(&mut [u8])>) {
-        let gpu = self.0.lock();
-        let fb = gpu.framebuffer();
-        if let Some(fb) = fb {
-            handler(fb);
-        }
-    }
-
-    fn setup_framebuffer(&self) /* -> virtio_drivers::Result<&mut [u8]> */
-    {
-        self.0.lock().setup_framebuffer().expect("failed to get fb");
+    fn setup_framebuffer(&self) -> (usize, usize) {
+        let mut gpu = self.0.lock();
+        let framebuffer = gpu.setup_framebuffer().expect("failed to get fb");
+        let vaddr = framebuffer.as_ptr() as usize;
+        let size = framebuffer.len();
+        return (vaddr, size);
     }
 
     fn flush(&self) -> virtio_drivers::Result {

@@ -93,12 +93,7 @@ pub trait GpuDriver: Driver {
         unimplemented!("not a gpu driver")
     }
 
-    fn set_framebuffer(&self, fb: Box<dyn Fn(&mut [u8])>) {
-        unimplemented!("not a gpu driver")
-    }
-
-    fn setup_framebuffer(&self) /* -> virtio_drivers::Result<&mut [u8]> */
-    {
+    fn setup_framebuffer(&self) -> (usize, usize) {
         unimplemented!("not a gpu driver")
     }
 
