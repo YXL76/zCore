@@ -424,12 +424,9 @@ pub fn init() {
     });
 }
 
-pub fn init_input() {
+fn init_kbd() {
     use linux_object::fs::{InputEvent, INPUT_EVENT};
-    let kbdfd =
-        std::fs::File::open("/dev/input/event1").expect("Failed to open input event device.");
-    let micefd =
-        std::fs::File::open("/dev/input/mice").expect("Failed to open input event device.");
+    let fd = std::fs::File::open("/dev/input/event1").expect("Failed to open input event device.");
     // ??
     /* let inputfd = unsafe {
         libc::open(
@@ -437,46 +434,60 @@ pub fn init_input() {
             libc::O_RDONLY | libc::O_NONBLOCK,
         )
     }; */
-    if kbdfd.as_raw_fd() < 0 || micefd.as_raw_fd() < 0 {
+    if fd.as_raw_fd() < 0 {
         return;
     }
+
     std::thread::spawn(move || {
         use core::mem::{size_of, transmute, transmute_copy};
         let ev = InputEvent::new(0, 0, 0);
-        let mut kbdbuf: [u8; size_of::<InputEvent>()] = unsafe { transmute(ev) };
-        let mut micebuf = [0u8; 3];
+        const LEN: usize = size_of::<InputEvent>();
+        let mut buf: [u8; LEN] = unsafe { transmute(ev) };
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(20));
-            let kbdret = unsafe {
-                libc::read(
-                    kbdfd.as_raw_fd(),
-                    kbdbuf.as_mut_ptr() as *mut libc::c_void,
-                    size_of::<InputEvent>(),
-                )
-            };
-            let miceret = unsafe {
-                libc::read(
-                    micefd.as_raw_fd(),
-                    micebuf.as_mut_ptr() as *mut libc::c_void,
-                    3,
-                )
-            };
-            if kbdret < 0 || miceret < 0 {
+            std::thread::sleep(std::time::Duration::from_millis(8));
+            let ret =
+                unsafe { libc::read(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, LEN) };
+            if ret < 0 {
                 break;
             }
-            let ev: InputEvent = unsafe { transmute_copy(&kbdbuf) };
+            let ev: InputEvent = unsafe { transmute_copy(&buf) };
             if ev.type_ == 1 {
                 INPUT_EVENT.lock().push_back(ev);
             }
-            if micebuf[0] & 0x1 != 0 {
+        }
+    });
+}
+
+fn init_mice() {
+    use linux_object::fs::{InputEvent, INPUT_EVENT};
+    let fd = std::fs::File::open("/dev/input/mice").expect("Failed to open input event device.");
+    if fd.as_raw_fd() < 0 {
+        return;
+    }
+
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 3];
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(8));
+            let ret =
+                unsafe { libc::read(fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, 3) };
+            if ret < 0 {
+                break;
+            }
+            if buf[0] & 0x1 != 0 {
                 INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x110, 1));
-            } else if micebuf[0] & 0x2 != 0 {
+            } else if buf[0] & 0x2 != 0 {
                 INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x111, 1));
-            } else if micebuf[0] & 0x4 != 0 {
+            } else if buf[0] & 0x4 != 0 {
                 INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x112, 1));
             }
         }
     });
+}
+
+pub fn init_input() {
+    init_kbd();
+    init_mice();
 }
 
 pub fn init_framebuffer() {
