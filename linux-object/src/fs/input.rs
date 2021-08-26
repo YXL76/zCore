@@ -77,7 +77,8 @@ lazy_static! {
 ///
 pub struct InputEvent {
     time: TimeVal,
-    type_: u16,
+    /// event type
+    pub type_: u16,
     code: u16,
     value: i32,
 }

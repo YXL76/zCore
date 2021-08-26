@@ -424,6 +424,40 @@ pub fn init() {
     });
 }
 
+pub fn init_input() {
+    use linux_object::fs::{InputEvent, INPUT_EVENT};
+    let inputfd = unsafe {
+        libc::open(
+            "/dev/input/event1".as_ptr() as *const i8,
+            libc::O_RDONLY | libc::O_NONBLOCK,
+        )
+    };
+    if inputfd < 0 {
+        return;
+    }
+    std::thread::spawn(move || {
+        use core::mem::{size_of, transmute, transmute_copy};
+        let ev = InputEvent::new(0, 0, 0);
+        let mut buf: [u8; size_of::<InputEvent>()] = unsafe { transmute(ev) };
+        loop {
+            if unsafe {
+                libc::read(
+                    inputfd,
+                    buf.as_mut_ptr() as *mut libc::c_void,
+                    size_of::<InputEvent>(),
+                )
+            } < 0
+            {
+                break;
+            }
+            let ev: InputEvent = unsafe { transmute_copy(&buf) };
+            if ev.type_ == 1 {
+                INPUT_EVENT.lock().push_back(ev);
+            }
+        }
+    });
+}
+
 pub fn init_framebuffer() {
     const FBIOGET_VSCREENINFO: u64 = 0x4600;
     const FBIOGET_FSCREENINFO: u64 = 0x4602;
