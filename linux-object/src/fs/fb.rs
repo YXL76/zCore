@@ -19,7 +19,6 @@ impl FbINode {
 impl INode for FbINode {
     #[allow(unsafe_code)]
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        error!("read_at not implemented");
         if let Some(fb) = FRAME_BUFFER.read().as_ref() {
             if offset >= fb.screen_size {
                 return Ok(0);
@@ -60,7 +59,6 @@ impl INode for FbINode {
 
     #[allow(unsafe_code)]
     fn io_control(&self, cmd: u32, data: usize) -> Result<usize> {
-        error!("io_control not implemented");
         match cmd as usize {
             FBIOGET_FSCREENINFO => {
                 if let Some(fb) = FRAME_BUFFER.read().as_ref() {

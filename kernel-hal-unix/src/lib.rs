@@ -426,8 +426,10 @@ pub fn init() {
 
 pub fn init_input() {
     use linux_object::fs::{InputEvent, INPUT_EVENT};
-    let inputfd =
+    let kbdfd =
         std::fs::File::open("/dev/input/event1").expect("Failed to open input event device.");
+    let micefd =
+        std::fs::File::open("/dev/input/mice").expect("Failed to open input event device.");
     // ??
     /* let inputfd = unsafe {
         libc::open(
@@ -435,28 +437,43 @@ pub fn init_input() {
             libc::O_RDONLY | libc::O_NONBLOCK,
         )
     }; */
-    if inputfd.as_raw_fd() < 0 {
+    if kbdfd.as_raw_fd() < 0 || micefd.as_raw_fd() < 0 {
         return;
     }
     std::thread::spawn(move || {
         use core::mem::{size_of, transmute, transmute_copy};
         let ev = InputEvent::new(0, 0, 0);
-        let mut buf: [u8; size_of::<InputEvent>()] = unsafe { transmute(ev) };
+        let mut kbdbuf: [u8; size_of::<InputEvent>()] = unsafe { transmute(ev) };
+        let mut micebuf = [0u8; 3];
         loop {
             std::thread::sleep(std::time::Duration::from_millis(20));
-            if unsafe {
+            let kbdret = unsafe {
                 libc::read(
-                    inputfd.as_raw_fd(),
-                    buf.as_mut_ptr() as *mut libc::c_void,
+                    kbdfd.as_raw_fd(),
+                    kbdbuf.as_mut_ptr() as *mut libc::c_void,
                     size_of::<InputEvent>(),
                 )
-            } < 0
-            {
+            };
+            let miceret = unsafe {
+                libc::read(
+                    micefd.as_raw_fd(),
+                    micebuf.as_mut_ptr() as *mut libc::c_void,
+                    3,
+                )
+            };
+            if kbdret < 0 || miceret < 0 {
                 break;
             }
-            let ev: InputEvent = unsafe { transmute_copy(&buf) };
+            let ev: InputEvent = unsafe { transmute_copy(&kbdbuf) };
             if ev.type_ == 1 {
                 INPUT_EVENT.lock().push_back(ev);
+            }
+            if micebuf[0] & 0x1 != 0 {
+                INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x110, 1));
+            } else if micebuf[0] & 0x2 != 0 {
+                INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x111, 1));
+            } else if micebuf[0] & 0x4 != 0 {
+                INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x112, 1));
             }
         }
     });

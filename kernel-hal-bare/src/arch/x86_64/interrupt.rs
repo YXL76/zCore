@@ -5,6 +5,8 @@ use super::{acpi_table::*, phys_to_virt};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use apic::IoApic;
+use linux_object::fs::{InputEvent, INPUT_EVENT};
+use ps2_mouse::{Mouse, MouseState};
 use spin::Mutex;
 use trapframe::TrapFrame;
 
@@ -15,17 +17,31 @@ lazy_static! {
     static ref IRQ_TABLE: Mutex<Vec<Option<InterruptHandle>>> = Default::default();
 }
 
+lazy_static! {
+    static ref MOUSE: Mutex<Mouse> = Mutex::new(Mouse::new());
+}
+
+fn on_complete(mouse_state: MouseState) {
+    if mouse_state.left_button_down() {
+        INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x110, 1));
+    } else if mouse_state.right_button_down() {
+        INPUT_EVENT.lock().push_back(InputEvent::new(1, 0x111, 1));
+    }
+}
+
 pub fn init() {
+    MOUSE.lock().init().unwrap();
+    MOUSE.lock().set_on_complete(on_complete);
     unsafe {
         init_ioapic();
     }
     init_irq_table();
     irq_add_handle(Timer + IRQ0, Box::new(timer));
-    irq_add_handle(Keyboard + IRQ0, Box::new(keyboard));
     irq_add_handle(Mouse + IRQ0, Box::new(mouse));
+    irq_add_handle(Keyboard + IRQ0, Box::new(keyboard));
     irq_add_handle(COM1 + IRQ0, Box::new(com1));
-    irq_enable_raw(Keyboard, Keyboard + IRQ0);
     irq_enable_raw(Mouse, Mouse + IRQ0);
+    irq_enable_raw(Keyboard, Keyboard + IRQ0);
     irq_enable_raw(COM1, COM1 + IRQ0);
 }
 
@@ -346,10 +362,9 @@ fn keyboard() {
 
 fn mouse() {
     use x86_64::instructions::port::PortReadOnly;
-    let mut data_port = PortReadOnly::<u8>::new(0x60);
-
-    let scancode = unsafe { data_port.read() };
-    error!("{}", scancode);
+    let mut port = PortReadOnly::new(0x60);
+    let packet = unsafe { port.read() };
+    MOUSE.lock().process_packet(packet);
 }
 
 // Reference: https://wiki.osdev.org/Exceptions

@@ -23,6 +23,7 @@ uart_16550 = "=0.2.15"
 x86_64 = "0.14"
 raw-cpuid = "9.0"
 pc-keyboard = "0.5"
+ps2-mouse = "0.1"
 apic = { git = "https://github.com/rcore-os/apic-rs", rev = "fb86bd7" }
 x86-smpboot = { git = "https://github.com/rcore-os/x86-smpboot", rev = "43ffedf" }
 rcore-console = { git = "https://github.com/rcore-os/rcore-console", default-features = false, rev = "a980897b" }
