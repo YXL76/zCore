@@ -426,9 +426,8 @@ pub fn init() {
 
 pub fn init_input() {
     use linux_object::fs::{InputEvent, INPUT_EVENT};
-    let inputfd = std::fs::File::open("/dev/input/event1")
-        .expect("Failed to open input event device.")
-        .as_raw_fd();
+    let inputfd =
+        std::fs::File::open("/dev/input/event1").expect("Failed to open input event device.");
     // ??
     /* let inputfd = unsafe {
         libc::open(
@@ -436,7 +435,7 @@ pub fn init_input() {
             libc::O_RDONLY | libc::O_NONBLOCK,
         )
     }; */
-    if inputfd < 0 {
+    if inputfd.as_raw_fd() < 0 {
         return;
     }
     std::thread::spawn(move || {
@@ -444,9 +443,10 @@ pub fn init_input() {
         let ev = InputEvent::new(0, 0, 0);
         let mut buf: [u8; size_of::<InputEvent>()] = unsafe { transmute(ev) };
         loop {
+            std::thread::sleep(std::time::Duration::from_millis(20));
             if unsafe {
                 libc::read(
-                    inputfd,
+                    inputfd.as_raw_fd(),
                     buf.as_mut_ptr() as *mut libc::c_void,
                     size_of::<InputEvent>(),
                 )
