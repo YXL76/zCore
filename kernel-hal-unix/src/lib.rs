@@ -426,12 +426,16 @@ pub fn init() {
 
 pub fn init_input() {
     use linux_object::fs::{InputEvent, INPUT_EVENT};
-    let inputfd = unsafe {
+    let inputfd = std::fs::File::open("/dev/input/event1")
+        .expect("Failed to open input event device.")
+        .as_raw_fd();
+    // ??
+    /* let inputfd = unsafe {
         libc::open(
             "/dev/input/event1".as_ptr() as *const i8,
             libc::O_RDONLY | libc::O_NONBLOCK,
         )
-    };
+    }; */
     if inputfd < 0 {
         return;
     }
