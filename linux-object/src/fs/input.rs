@@ -21,10 +21,13 @@ impl InputEventINode {
 impl INode for InputEventINode {
     #[allow(unsafe_code)]
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let event = INPUT_EVENT
-            .lock()
-            .pop_front()
-            .unwrap_or(InputEvent::new(0, 0, 0));
+        let event = {
+            let mut queue = INPUT_EVENT.lock();
+            if queue.len() == 0 {
+                return Ok(0);
+            };
+            queue.pop_front().unwrap_or(InputEvent::new(0, 0, 0))
+        };
         let event: [u8; core::mem::size_of::<InputEvent>()] =
             unsafe { core::mem::transmute(event) };
         let len = event.len().min(buf.len());
